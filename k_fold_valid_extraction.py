@@ -3,7 +3,9 @@ import pandas as pd
 import platform
 
 from tqdm import trange
-from typing import Tuple, Dict
+from typing import Tuple
+from random import shuffle
+from collections import defaultdict
 
 qlabels = [
     'symptoms', 'treatment', 'information', 'causes',
@@ -62,73 +64,126 @@ def check_labels(df: pd.DataFrame, whichdataset: str) -> pd.DataFrame:
         raise ValueError('Invalid dataset name')
     return df
 
-def combine_datasets_with_same_label(
-    df1: pd.DataFrame,
+
+def randomize(size: int, df: pd.DataFrame) -> pd.DataFrame:
+    lst: list[int] = list(range(size))
+    shuffle(lst)
+    return df.loc[lst]
+
+
+
+def combine_datasets(
+    df1: pd.DataFrame, 
     df2: pd.DataFrame,
-    k: int = 10
-) -> Tuple[Tuple[pd.DataFrame], Tuple[pd.DataFrame]]:
+    method: str | None = None,
+) -> pd.DataFrame:
     """
-        Combine two datasets with the same label
+        Output the combined dataset with the specified method, default is None
 
         Parameters:
-            df1 (pd.DataFrame): The first dataset
-            df2 (pd.DataFrame): The second dataset
+            df1 (pd.DataFrame): The first DataFrame
+            df2 (pd.DataFrame): The second DataFrame
+            method (str): The method to combine the datasets
+                - None, Other: Concatenate the datasets
+                - Random: Randomly combine the datasets
+        
+        Returns:
+            pd.DataFrame: The combined DataFrame
     """
-    k_fold_train: list[pd.DataFrame] = []
-    k_fold_test: list[pd.DataFrame] = []
+    # Concatenate the datasets
+    # question, answer, label, focus_area
+    #
+    # df1: HealthCare_NLP
+    #     - question	answer	source	focus_area	label
+    # df2: Comprehensive_QA
+    #     - qtype	Diseases(full name)	Question	Answer
+    # df: Combined
+    #     - question	answer	label	focus_area
+    dct: defaultdict[str, list] = defaultdict(list)
+    s1, s2 = df1.shape[0], df2.shape[0]
+    print('Extracting HealthCare_NLP ...')
+    for i in trange(s1):
+        dct['question'].append(df1.loc[i, 'question'])
+        dct['answer'].append(df1.loc[i, 'answer'])
+        dct['label'].append(df1.loc[i, 'label'])
+        dct['focus_area'].append(df1.loc[i, 'focus_area'])
+    print('Finished HealthCare_NLP...'), stop()
+    print('Extracting Comprehensive_QA ...')
+    for i in trange(s2):
+        dct['question'].append(df2.loc[i, 'Question'])
+        dct['answer'].append(df2.loc[i, 'Answer'])
+        dct['label'].append(df2.loc[i, 'qtype'])
+        dct['focus_area'].append(df2.loc[i, 'Diseases(full name)'])
+    print('Finished Comprehensive_QA...')
+
+    tot = s1 + s2
+    print('Combining ...')
+    df = pd.DataFrame(dct)
+    if method == 'Random':
+        df = randomize(tot, df)
+    print('Finished combining...'), stop()
+    return df
+
+
+def k_fold(
+    combined_df: pd.DataFrame, 
+    k: int = 10,
+    method: str | None = None
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
     if k < 10:
         raise ValueError('k must be greater than 10')
     
-
-
-    s1, s2 = len(df1), len(df2) # the size of the datasets
-    temp_fold_train: list[Dict[str, list[str]]] = []
-    temp_fold_test: list[Dict[str, list[str]]] = []
+    size = combined_df.shape[0]
+    temp_fold_train: list[defaultdict[str, list[str]]] = []
+    temp_fold_test: list[defaultdict[str, list[str]]] = []
     for _ in range(k):
-        temp_fold_train.append({
-            'question': [],
-            'answer': [],
-            'label': []
-        })
-        temp_fold_test.append({
-            'question': [],
-            'answer': [],
-            'label': []
-        })
-    for i in trange(s1):
-        question = df1.iloc[i]['question']
-        answer = df1.iloc[i]['answer']
-        label = df1.iloc[i]['label']
-        for j in range(k):
-            if i % k == j:
-                temp_fold_test[j]['question'].append(question)
-                temp_fold_test[j]['answer'].append(answer)
-                temp_fold_test[j]['label'].append(label)
-            else:
-                temp_fold_train[j]['question'].append(question)
-                temp_fold_train[j]['answer'].append(answer)
-                temp_fold_train[j]['label'].append(label)
-    
-    for i in trange(s2):
-        question = df2.iloc[i]['Question']
-        answer = df2.iloc[i]['Answer']
-        label = df2.iloc[i]['qtype']
-        for j in range(k):
-            if i % k == j:
-                temp_fold_test[j]['question'].append(question)
-                temp_fold_test[j]['answer'].append(answer)
-                temp_fold_test[j]['label'].append(label)
-            else:
-                temp_fold_train[j]['question'].append(question)
-                temp_fold_train[j]['answer'].append(answer)
-                temp_fold_train[j]['label'].append(label)
+        temp_fold_train.append(defaultdict(list))
+        temp_fold_test.append(defaultdict(list))
 
+    if method == 'Random':
+        # Already randomized
+        number = size // k + 1
+        for i in trange(size):
+            question = combined_df.loc[i, 'question']
+            answer = combined_df.loc[i, 'answer']
+            label = combined_df.loc[i, 'label']
+            focus_area = combined_df.loc[i, 'focus_area']
+            for j in range(k):
+                if i // number == j:
+                    temp_fold_test[j]['question'].append(question)
+                    temp_fold_test[j]['answer'].append(answer)
+                    temp_fold_test[j]['label'].append(label)
+                    temp_fold_test[j]['focus_area'].append(focus_area)
+                else:
+                    temp_fold_train[j]['question'].append(question)
+                    temp_fold_train[j]['answer'].append(answer)
+                    temp_fold_train[j]['label'].append(label)
+                    temp_fold_train[j]['focus_area'].append(focus_area)
+    else:
+        for i in trange(size):
+            question = combined_df.loc[i, 'question']
+            answer = combined_df.loc[i, 'answer']
+            label = combined_df.loc[i, 'label']
+            focus_area = combined_df.loc[i, 'focus_area']
+            for j in range(k):
+                if i % k == j:
+                    temp_fold_test[j]['question'].append(question)
+                    temp_fold_test[j]['answer'].append(answer)
+                    temp_fold_test[j]['label'].append(label)
+                    temp_fold_test[j]['focus_area'].append(focus_area)
+                else:
+                    temp_fold_train[j]['question'].append(question)
+                    temp_fold_train[j]['answer'].append(answer)
+                    temp_fold_train[j]['label'].append(label)
+                    temp_fold_train[j]['focus_area'].append(focus_area)
+        
     for i in range(k):
-        k_fold_train.append(pd.DataFrame(temp_fold_train[i]))
-        k_fold_test.append(pd.DataFrame(temp_fold_test[i]))
+        train = pd.DataFrame(temp_fold_train[i])
+        test = pd.DataFrame(temp_fold_test[i])
+        tocsv(train, f'./process/k_fold/train_{i}{f"_{method}" if method == 'Random' else ""}')
+        tocsv(test, f'./process/k_fold/test_{i}{f"_{method}" if method == 'Random' else ""}')
+        print(f'Data {i} saved... ({method if method == 'Random' else "General"})'), stop()
 
-    return tuple(k_fold_train), tuple(k_fold_test)
-    
 
 def tocsv(df: pd.DataFrame, filename: str) -> None:
     """
@@ -139,42 +194,28 @@ def tocsv(df: pd.DataFrame, filename: str) -> None:
     """
     df.to_csv(f'{filename}.csv', index=False)
 
+
 if __name__ == '__main__':
     # HealthCare_NLP
-    df_HealthCare_NLP = pd.read_csv('data/HealthCare_NLP.csv')
+    df_HealthCare_NLP = pd.read_csv('data/HealthCare_NLP_v1.csv')
     df_HealthCare_NLP = check_labels(df_HealthCare_NLP, 'HealthCare_NLP')
     # Comprehensive_QA
-    df_Comprehensive_QA = pd.read_csv('data/Comprehensive_QA.csv')
+    df_Comprehensive_QA = pd.read_csv('data/Comprehensive_QA_v1.csv')
     df_Comprehensive_QA = check_labels(df_Comprehensive_QA, 'Comprehensive_QA')
     clear(), print('Two Datasets checked...'), stop()
 
     # If the datasets are checked, combine them
     print('Combining datasets...')
-    train, test = combine_datasets_with_same_label(df_HealthCare_NLP, df_Comprehensive_QA)
-    tocsv(train[0], 'train'), tocsv(test[0], 'test')
-
-# question answer label
-# random 
-# 32000 
-# 20000 - 30000
-# 2000
-
-"""
-'symptoms'
-    - 'complications'
-    - 'stages'
-'treatment'
-'information'
-    - 'frequency'
-    - 'inheritance'
-    - 'outlook'
-    - 'support groups'
-    - 'considerations'
-    - 'genetic changes'
-'causes'
-'tests':
-    - 'exams and tests'
-'prevention'
-'susceptibility'
-'research'
-"""
+    df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA)
+    tocsv(df_combined, './process/combined/combined'), clear()
+    print('Combined dataset saved...'), stop()
+    print('Splitting datasets...')
+    k_fold(df_combined, 10), stop()
+    ############################################################################################################
+    df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA, 'Random')
+    tocsv(df_combined, './process/combined/combined_random'), clear()
+    print('Randomly combined dataset saved...'), stop()
+    print('Splitting datasets...')
+    k_fold(df_combined, 10, 'Random')
+    ############################################################################################################
+    print('All done!'), stop(2), clear()

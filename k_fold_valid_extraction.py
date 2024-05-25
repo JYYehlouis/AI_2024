@@ -102,11 +102,18 @@ def combine_datasets(
     dct: defaultdict[str, list] = defaultdict(list)
     s1, s2 = df1.shape[0], df2.shape[0]
     print('Extracting HealthCare_NLP ...')
+    label_nums: int = 0
+    label_nums_dct: defaultdict[str, int] = defaultdict(int)
     for i in trange(s1):
         dct['question'].append(df1.loc[i, 'question'])
         dct['answer'].append(df1.loc[i, 'answer'])
         dct['label'].append(df1.loc[i, 'label'])
         dct['focus_area'].append(df1.loc[i, 'focus_area'])
+        disease = df1.loc[i, 'focus_area']
+        if disease not in label_nums_dct.keys():
+            label_nums_dct[disease] = label_nums
+            label_nums += 1
+        dct['label_num'].append(label_nums_dct[disease])
     print('Finished HealthCare_NLP...'), stop()
     print('Extracting Comprehensive_QA ...')
     for i in trange(s2):
@@ -114,12 +121,18 @@ def combine_datasets(
         dct['answer'].append(df2.loc[i, 'Answer'])
         dct['label'].append(df2.loc[i, 'qtype'])
         dct['focus_area'].append(df2.loc[i, 'Diseases(full name)'])
+        disease = df2.loc[i, 'Diseases(full name)']
+        if disease not in label_nums_dct.keys():
+            label_nums_dct[disease] = label_nums
+            label_nums += 1
+        dct['label_num'].append(label_nums_dct[disease])
     print('Finished Comprehensive_QA...')
 
     tot = s1 + s2
     print('Combining ...')
     df = pd.DataFrame(dct)
     if method == 'Random':
+        print('Randomizing...')
         df = randomize(tot, df)
     print('Finished combining...'), stop()
     return df
@@ -148,41 +161,47 @@ def k_fold(
             answer = combined_df.loc[i, 'answer']
             label = combined_df.loc[i, 'label']
             focus_area = combined_df.loc[i, 'focus_area']
+            label_num = combined_df.loc[i, 'label_num']
             for j in range(k):
                 if i // number == j:
                     temp_fold_test[j]['question'].append(question)
                     temp_fold_test[j]['answer'].append(answer)
                     temp_fold_test[j]['label'].append(label)
                     temp_fold_test[j]['focus_area'].append(focus_area)
+                    temp_fold_test[j]['label_num'].append(label_num)
                 else:
                     temp_fold_train[j]['question'].append(question)
                     temp_fold_train[j]['answer'].append(answer)
                     temp_fold_train[j]['label'].append(label)
                     temp_fold_train[j]['focus_area'].append(focus_area)
+                    temp_fold_train[j]['label_num'].append(label_num)
     else:
         for i in trange(size):
             question = combined_df.loc[i, 'question']
             answer = combined_df.loc[i, 'answer']
             label = combined_df.loc[i, 'label']
             focus_area = combined_df.loc[i, 'focus_area']
+            label_num = combined_df.loc[i, 'label_num']
             for j in range(k):
                 if i % k == j:
                     temp_fold_test[j]['question'].append(question)
                     temp_fold_test[j]['answer'].append(answer)
                     temp_fold_test[j]['label'].append(label)
                     temp_fold_test[j]['focus_area'].append(focus_area)
+                    temp_fold_test[j]['label_num'].append(label_num)
                 else:
                     temp_fold_train[j]['question'].append(question)
                     temp_fold_train[j]['answer'].append(answer)
                     temp_fold_train[j]['label'].append(label)
                     temp_fold_train[j]['focus_area'].append(focus_area)
+                    temp_fold_train[j]['label_num'].append(label_num)
         
     for i in range(k):
         train = pd.DataFrame(temp_fold_train[i])
         test = pd.DataFrame(temp_fold_test[i])
-        tocsv(train, f'./process/k_fold/train_{i}{f"_{method}" if method == 'Random' else ""}')
-        tocsv(test, f'./process/k_fold/test_{i}{f"_{method}" if method == 'Random' else ""}')
-        print(f'Data {i} saved... ({method if method == 'Random' else "General"})'), stop()
+        tocsv(train, f'./data/k_fold/k_fold{f"_random" if method == 'Random' else ""}_train_{i}')
+        tocsv(test, f'./data/k_fold/k_fold{f"_random" if method == 'Random' else ""}_test_{i}')
+        print(f'Data {i + 1} saved... ({method if method == 'Random' else "General"})'), stop()
 
 
 def tocsv(df: pd.DataFrame, filename: str) -> None:
@@ -192,6 +211,11 @@ def tocsv(df: pd.DataFrame, filename: str) -> None:
         Parameters:
             df (pd.DataFrame): The DataFrame to write
     """
+    path_dir = '/'.join(filename.split('/')[:-1])
+    if os.path.exists(path_dir):
+        pass
+    else:
+        os.mkdir(path_dir)
     df.to_csv(f'{filename}.csv', index=False)
 
 
@@ -207,13 +231,15 @@ if __name__ == '__main__':
     # If the datasets are checked, combine them
     print('Combining datasets...')
     df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA)
-    tocsv(df_combined, './process/combined/combined'), clear()
+    tocsv(df_combined, './data/combined/combined'), clear()
+    df_combined = pd.read_csv('./data/combined/combined.csv')
     print('Combined dataset saved...'), stop()
     print('Splitting datasets...')
     k_fold(df_combined, 10), stop()
     ############################################################################################################
     df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA, 'Random')
-    tocsv(df_combined, './process/combined/combined_random'), clear()
+    tocsv(df_combined, './data/combined/combined_random'), clear()
+    df_combined = pd.read_csv('./data/combined/combined_random.csv')
     print('Randomly combined dataset saved...'), stop()
     print('Splitting datasets...')
     k_fold(df_combined, 10, 'Random')

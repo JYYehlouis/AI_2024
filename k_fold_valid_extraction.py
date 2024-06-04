@@ -221,7 +221,7 @@ def tocsv(df: pd.DataFrame, filename: str) -> None:
 
 if __name__ == '__main__':
     # HealthCare_NLP
-    df_HealthCare_NLP = pd.read_csv('data/HealthCare_NLP_v1.csv')
+    df_HealthCare_NLP = pd.read_csv('data/Healthcare_NLP_v1.csv')
     df_HealthCare_NLP = check_labels(df_HealthCare_NLP, 'HealthCare_NLP')
     # Comprehensive_QA
     df_Comprehensive_QA = pd.read_csv('data/Comprehensive_QA_v1.csv')

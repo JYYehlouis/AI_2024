@@ -32,11 +32,11 @@ def check_labels(df: pd.DataFrame, whichdataset: str) -> pd.DataFrame:
             whichdataset (str): The dataset name
     """
     if whichdataset == 'Comprehensive_QA':
-        print('Checking Comprehensive_QA dataset...'), stop()
+        # print('Checking Comprehensive_QA dataset...'), stop()
         # symptoms
         df.loc[df['qtype'] == 'complications', 'qtype'] = 'symptoms'
         df.loc[df['qtype'] == 'stages', 'qtype'] = 'symptoms'
-        print('\tsymptoms checked...'), stop()
+        # print('\tsymptoms checked...'), stop()
         # information
         df.loc[df['qtype'] == 'frequency', 'qtype'] = 'information'
         df.loc[df['qtype'] == 'inheritance', 'qtype'] = 'information'
@@ -44,22 +44,22 @@ def check_labels(df: pd.DataFrame, whichdataset: str) -> pd.DataFrame:
         df.loc[df['qtype'] == 'support groups', 'qtype'] = 'information'
         df.loc[df['qtype'] == 'considerations', 'qtype'] = 'information'
         df.loc[df['qtype'] == 'genetic changes', 'qtype'] = 'information'
-        print('\tinformation checked...'), stop()
+        # print('\tinformation checked...'), stop()
         # tests
         df.loc[df['qtype'] == 'exams and tests', 'qtype'] = 'tests'   
-        print('\ttests checked...'), stop()
-        print('Comprehensive_QA dataset checked...'), stop(), clear()
+        # print('\ttests checked...'), stop()
+        # print('Comprehensive_QA dataset checked...'), stop(), clear()
     elif whichdataset == 'HealthCare_NLP':
-        print('Checking HealthCare_NLP dataset...'), stop()
+        # print('Checking HealthCare_NLP dataset...'), stop()
         labels = df['label'].unique()
         for label in labels:
             if label not in qlabels:
                 raise ValueError(f'Invalid label: {label}')
-            print(f"\t{label} checked..."), stop()
+            # print(f"\t{label} checked..."), stop()
         if len(labels) != len(qlabels):
             raise ValueError('Some labels are missing')
-        print("Done!"), stop(), clear()
-        print('HealthCare_NLP dataset checked...'), stop()
+        # print("Done!"), stop(), clear()
+        # print('HealthCare_NLP dataset checked...'), stop()
     else:
         raise ValueError('Invalid dataset name')
     return df
@@ -101,7 +101,7 @@ def combine_datasets(
     #     - question	answer	label	focus_area
     dct: defaultdict[str, list] = defaultdict(list)
     s1, s2 = df1.shape[0], df2.shape[0]
-    print('Extracting HealthCare_NLP ...')
+    # print('Extracting HealthCare_NLP ...')
     label_nums: int = 0
     label_nums_dct: defaultdict[str, int] = defaultdict(int)
     for i in trange(s1):
@@ -114,8 +114,8 @@ def combine_datasets(
             label_nums_dct[disease] = label_nums
             label_nums += 1
         dct['label_num'].append(label_nums_dct[disease])
-    print('Finished HealthCare_NLP...'), stop()
-    print('Extracting Comprehensive_QA ...')
+    # print('Finished HealthCare_NLP...'), stop()
+    # print('Extracting Comprehensive_QA ...')
     for i in trange(s2):
         dct['question'].append(df2.loc[i, 'Question'])
         dct['answer'].append(df2.loc[i, 'Answer'])
@@ -126,15 +126,15 @@ def combine_datasets(
             label_nums_dct[disease] = label_nums
             label_nums += 1
         dct['label_num'].append(label_nums_dct[disease])
-    print('Finished Comprehensive_QA...')
+    # print('Finished Comprehensive_QA...')
 
     tot = s1 + s2
-    print('Combining ...')
+    # print('Combining ...')
     df = pd.DataFrame(dct)
     if method == 'Random':
-        print('Randomizing...')
+        # print('Randomizing...')
         df = randomize(tot, df)
-    print('Finished combining...'), stop()
+    # print('Finished combining...'), stop()
     return df
 
 
@@ -199,9 +199,9 @@ def k_fold(
     for i in range(k):
         train = pd.DataFrame(temp_fold_train[i])
         test = pd.DataFrame(temp_fold_test[i])
-        tocsv(train, f'./data/k_fold/k_fold{f"_random" if method == 'Random' else ""}_train_{i}')
-        tocsv(test, f'./data/k_fold/k_fold{f"_random" if method == 'Random' else ""}_test_{i}')
-        print(f'Data {i + 1} saved... ({method if method == 'Random' else "General"})'), stop()
+        tocsv(train, f'./data/k_fold/k_fold{"_random" if method == "Random" else ""}_train_{i}')
+        tocsv(test, f'./data/k_fold/k_fold{"_random" if method == "Random" else ""}_test_{i}')
+        # print(f'Data {i + 1} saved... ({method if method == "Random" else "General"})'), stop()
 
 
 def tocsv(df: pd.DataFrame, filename: str) -> None:
@@ -226,22 +226,22 @@ if __name__ == '__main__':
     # Comprehensive_QA
     df_Comprehensive_QA = pd.read_csv('data/Comprehensive_QA_v1.csv')
     df_Comprehensive_QA = check_labels(df_Comprehensive_QA, 'Comprehensive_QA')
-    clear(), print('Two Datasets checked...'), stop()
+    # clear(), print('Two Datasets checked...'), stop()
 
     # If the datasets are checked, combine them
-    print('Combining datasets...')
+    # print('Combining datasets...')
     df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA)
-    tocsv(df_combined, './data/combined/combined'), clear()
+    tocsv(df_combined, './data/combined/combined') # , clear()
     df_combined = pd.read_csv('./data/combined/combined.csv')
-    print('Combined dataset saved...'), stop()
-    print('Splitting datasets...')
-    k_fold(df_combined, 10), stop()
+    # print('Combined dataset saved...'), stop()
+    # print('Splitting datasets...')
+    k_fold(df_combined, 10) # , stop()
     ############################################################################################################
     df_combined = combine_datasets(df_HealthCare_NLP, df_Comprehensive_QA, 'Random')
     tocsv(df_combined, './data/combined/combined_random'), clear()
     df_combined = pd.read_csv('./data/combined/combined_random.csv')
-    print('Randomly combined dataset saved...'), stop()
-    print('Splitting datasets...')
+    # print('Randomly combined dataset saved...'), stop()
+    # print('Splitting datasets...')
     k_fold(df_combined, 10, 'Random')
     ############################################################################################################
-    print('All done!'), stop(2), clear()
+    # print('All done!'), stop(2), clear()
